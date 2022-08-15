@@ -1,0 +1,1014 @@
+---
+title: "STA 380, Part 2: Exercises"
+author: Anushka Iyer, Audrey Hsien, Monica Martinez, Olivia(Ryunghee) Lee
+date: August 15, 2022
+output: pdf_document
+---
+
+```{r include= FALSE, echo= FALSE, warning = FALSE}
+
+rm(list = ls())
+library(tidyverse) 
+library(mosaic)
+library(ISLR2)
+library(tidyverse) 
+library(igraph) 
+library(arules)   
+library(arulesViz)
+library(quantmod)
+library(foreach)
+```
+
+## **Probability practice**
+
+### **Part A**
+
+yes = (yes | RC) * P(RC) + (yes | TC) * P(TC)
+
+0.65 = (yes | RC) * 0.3 + (yes | TC) * 0.7
+
+0.65 = 0.5 * 0.3 + (yes|TC) * 0.7
+
+0.5 = (yes|TC) * 0.7
+```{r echo=FALSE, warning=FALSE}
+0.5/0.7
+```
+(yes|TC) = 0.7142
+
+### **Part B**
+
+D = Disease
+H = Healthy
+P(D) = 0.000025
+P(H) = 1-0.000025 = 0.999975
+P(T+ | D) = 0.993
+P(T- | H) = 0.9999
+1-P(T- | H) = 0.0001 = P(T+ | H)
+
+(P(T+ | D) * P(D)) / (P(T+ | D) * P(D)) + P(T+ | H))*P(H)
+
+```{r echo=FALSE, warning=FALSE}
+(0.993*0.000025)/(0.993*0.000025 + 0.0001*0.999975)
+```
+
+approximately 19.89% tested positive has the disease.
+
+## **Wrangling the Billboard Top 100**
+
+
+### Part A
+The following table shows the top 10 songs sorted by the number of weeks the song appeared in the Billboard Top 100.  
+
+```{r echo=FALSE, warning=FALSE}
+billboard = read.csv('D:/Summer/STA2/project/billboard.csv', header=TRUE)
+
+# Creating the Table
+billboard_a <- billboard %>% 
+  select(performer, song, year, week, week_position) %>%
+  group_by(performer, song) %>%
+  count(song) %>%
+  arrange(desc(n)) %>%
+  head(10)
+
+names(billboard_a)[3] <- 'count'
+
+```
+
+
+### Part B
+In the plotted line graph, there are a few interesting trends to note. Since 1959, there was increase of "musical diversity" on the Billboard Top 100, which peaked at 832 songs in 1966 before sharply declining to a low in 2001. After dropping to a low of 387 songs, there was a unsteady general increase to 804 unique songs in 2020.
+
+
+```{r echo=FALSE, warning=FALSE}
+
+# Creating the Table
+billboard_b <- billboard %>%  
+  select(year, song, performer) %>%
+  filter(year != 1958) %>% 
+  filter(year != 2021) %>% 
+  distinct(year, song, performer)
+
+# Checking the Numbers
+billboard_b %>%
+  count(year)  
+
+# Libraries
+library(ggplot2)
+
+# Plot the line graph
+ggplot(billboard_b,aes(year))+geom_line(aes(fill=..count..),stat="bin",binwidth=1)+labs(y= "Number of Unique Songs", x = "Year")
+
+
+
+```
+
+### Part C
+This bar plot includes the 19 artists in U.S. musical history who have had at least 30 songs that appeared on the Billboard Top 100 for at least ten weeks. The graph shows the performers with the count of "10-week hits" they have had since 1958 with Elton John taking lead with 52 of his songs being "10-week hits". 
+
+
+```{r echo=FALSE, warning=FALSE}
+
+# libraries
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+
+# Creating the Table
+# From Part A
+# 10 week hits
+billboard_10week_c <- billboard %>% 
+  select(performer, song, year, week) %>%
+  group_by(performer, song) %>%
+  count(song) %>%
+  arrange(desc(n)) %>%
+  filter(n >= 10) 
+
+names(billboard_10week_c)[3] <- 'count'
+
+
+# Creating table artist with at least 30 ten week hits
+billboard_artist_c <- billboard_10week_c %>%
+  summarise(performer) %>%
+  count(performer)%>%
+  arrange(desc(n)) %>%
+  filter(n >= 30)
+
+names(billboard_artist_c)[2] <- 'num_hits'
+
+
+# Libraries
+library(ggplot2)
+
+# Plot the bar graph
+ggplot(data=billboard_artist_c, aes(x=reorder(performer, num_hits), num_hits)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  coord_flip()+
+  theme_minimal() + 
+   labs(x = "Artists", y = "Number of 10-Week Hits")
+
+
+```
+
+
+## **Visual story telling part 1: green buildings**
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings <- read.csv('D:/Summer/STA2/project/greenbuildings.csv')
+attach(greenbuildings)
+```
+
+```{r echo= FALSE, warning = FALSE}
+hist(leasing_rate, breaks=50, col="blue")
+```
+
+1)  Verifying the first analysis made by the stats guru regarding occupancy rates and rent -
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% 
+  filter(leasing_rate>10) %>% 
+    group_by(green_rating) %>% 
+      summarise(median_rent = median(Rent), mean_rent = mean(Rent), houses = n())
+```
+
+Finding - Stats guru is right on the finding that among the houses with occupancy rate greater than 10% , the green buildings charge 2.6\$ more per sq. ft. than the non green buildings.
+
+Plotting data to check for outliers -
+
+```{r echo= FALSE, warning = FALSE}
+ggplot(greenbuildings) + geom_boxplot(aes(x=factor(green_rating), y=Rent))
+```
+
+Finding : Stats guru's reasoning is indeed true- there are a lot of outliers for non green buildings and hence median is the right way to go instead of mean.
+
+### 2) Lets check for Rent vs occupancy rate trend in green buildings :
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% filter(green_rating==1) %>% 
+  ggplot(aes(leasing_rate, Rent, color = green_rating)) +     geom_point() 
+```
+
+Finding : We observe that the occupancy rate for green buildings is higher than 50%. The median value for occupancy rate is around 93% (as can be seen from the summary below) which is close to 90% approximately as stated by guru.
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% group_by(green_rating) %>% summarise(occupancy = median(leasing_rate), count = n())
+
+#box plot to prove outliers in leasing rate, hence median used above
+# ggplot(greenbuildings) + geom_boxplot(aes(x=factor(green_rating), y=leasing_rate))
+```
+
+3)  Checking for impact of sustainability of green buildings vs occupancy rate
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% group_by(green_rating) %>% ggplot(aes(leasing_rate,age,color=green_rating))+ geom_point()
+
+```
+
+Finding : There is no defined relationship between age of green building and occupancy rate. Hence, the stats guru's assessment of assuming that the occupancy rate would remain the same over 9 years to be able to make profit is incorrect.
+
+
+
+### Let us check for confounding factors for the relationship between rent and green status :
+
+**a) Number of stories**
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% 
+  ggplot(aes(stories, Rent, color = green_rating)) + geom_point()+ geom_abline() 
+```
+
+We observe a linear relation between the rent and no of stories for green buildings. The minimum rent shows an increase with increasing number of stories. Our client may thus be able to demand a higher rent with a taller building.
+
+Let's plot and see:
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% group_by(green_rating) %>% summarise(med_stories = median(stories), count= n()) 
+```
+
+We observe a difference of only 1 story . Hence, it is not a confounding factor!
+
+**b) Age**
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% group_by(green_rating) %>% summarise(med_age = median(age), count = n())
+```
+
+Green buildings are younger by around 15 years. Do newer buildings in general demand higher rent? Let us plot and check :
+
+```{r echo= FALSE, warning = FALSE}
+ggplot(greenbuildings, aes(age, Rent, color = green_rating)) + geom_point()
+```
+
+There doesn't appear to be a significant relationship between age and rent, and hence, age doesn't appear to be a confounding factor.
+
+**c) Amenities**
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% group_by(green_rating,amenities) %>% summarise(rent = median(Rent), count=n()) 
+```
+
+Comparing rents for green & non-green buildings without amenities, there is still a premium for green buildings (\$2) ,meaning which, amenities is not a confounding factor in raising rent of green buildings.
+
+**d) Size**
+
+As size increases, rent also increases.
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% ggplot(aes(size, Rent, color = green_rating)) + geom_point() 
+
+greenbuildings %>% group_by(green_rating) %>% summarise(med_size = median(size), mean_size = mean(size),count =n()) 
+```
+
+Green buildings have avg size more than that of non green buildings. Therefore size is a confounding factor
+
+**e) Geographic location (cluster)**
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% 
+  group_by(green_rating) %>%
+  ggplot(aes(cluster,Rent, color=green_rating)) + geom_point()
+```
+
+Observation - Median rent for green buildings in this geographic region is ~4\$ higher than non green buildings.
+
+```{r echo= FALSE, warning = FALSE}
+greenbuildings %>% filter(cluster>=250 & cluster<=500) %>% group_by(green_rating) %>% summarise(med = median(Rent), count = n())
+```
+There is a difference of \$4 between green and non-green buildings for clusters 250 - 500, possibly due to increased environmental awareness. We could thus generate an additional revenue of (4*250,000) = \$1 million per year.
+
+Key Takeaways :
+
+-   There is an additional \$2.6 in revenue from green buildings and it goes upto 4$ for clusters between 250 - 500.
+
+-   There is a positive relation between rent and occupancy rates. Green buildings have a better rate of occupancy rates.
+
+-   There is no relation between age of the building and occupancy rates.
+
+-   Also we found that rent and size have a subtle positive relationship and is a confounding factor.
+
+
+The stats guru's assumptions of being able to recuperate costs in around 8-9 years seems to be right. Irrespective of the age of the building, the occupancy rate is high ( close to 90%). Further, as the popularity of green buildings increase, there might be an increase in the occupancy rate which could lead us to generate higher revenue. Hence, we believe that the stats guru's analyses are significant to the construction of the green building.
+ 
+
+```{r echo= FALSE, warning = FALSE}
+ # greenbuildings %>% group_by(cluster) %>% 
+ #   summarise(rent = mean(Rent), count = n()) %>% 
+ #   ggplot(aes(cluster,rent)) + geom_point() 
+ # average rent increases as ??
+```
+
+## 
+
+## **Visual story telling part 2: Capital Metro data**
+
+```{r echo = FALSE}
+capmetro <- read.csv('D:/Summer/STA2/project/capmetro_UT.csv')
+attach(capmetro)
+summary(capmetro)
+head(capmetro)
+```
+
+Passengers are more on weekdays or weekends??
+
+```{r echo = FALSE}
+ggplot(capmetro) + 
+  geom_boxplot(aes(x=weekend, y=boarding)) +
+  ggtitle("Boarding trend across weekdays and weekends") +
+  labs(caption = "We observe more riders on weekdays as compared to weekends. Possibly owing to the student traffic. \nAverage ridership count on weekdays is more than twice that on weekends.")
+```
+
+How do the boarding numbers trend across the week?
+
+```{r echo = FALSE}
+ggplot(capmetro) + 
+  geom_boxplot(aes(x=day_of_week, y=boarding)) + 
+   ggtitle("Boarding trend across days of the week") +
+    labs(caption = "Clearly, there is more traffic possibly owing to students attending university classes on weekdays than on weekends.")
+```
+
+Calculating average commute statistics..
+
+```{r echo = FALSE}
+avg_commute_stats <- capmetro %>%
+  group_by(day_of_week, hour_of_day) %>%
+  summarise(avg_boarding = mean(boarding),
+            avg_alighting = mean(alighting),
+            on_board = mean(boarding) - mean(alighting) )
+avg_commute_stats
+```
+
+```{r echo = FALSE}
+ggplot(capmetro, aes(fill=month, y=boarding, x=day_of_week)) + 
+    geom_bar(position="dodge", stat="identity") +
+  labs(title = 'Boarding trends across days in months', caption = 'Ridership boarding counts seems to be the highest for the month of October \n probably due to the peak fall classes schedule.')
+```
+
+```{r}
+----NA
+temp_changes <- capmetro %>% 
+  group_by(month) %>%
+  summarise(max_temp = max(temperature),
+            min_temp = min(temperature),
+            mean_temp = mean(temperature))
+
+temp_changes%>%
+  ggplot(aes(month, mean_temp)) +
+  geom_point() +
+  labs(title = 'Temperature variation across months', caption = 'Looking for the reasoning of increase in ridership in November. We observe  in temperature across months. Temperature is not one of the factors ')
+```
+
+```{r echo = FALSE}
+avg_commute_stats %>% 
+  ggplot(aes(x=hour_of_day,y = avg_boarding)) +
+    geom_point(colour = 'blue') +
+      facet_wrap(~day_of_week)+
+ggtitle('Average boarding across hours of the week') +
+  labs(caption ="Average ridership seems to be higher post 3pm on weekdays.")
+```
+
+```{r echo = FALSE}
+avg_commute_stats %>% 
+  ggplot(aes(x=hour_of_day,y = avg_alighting)) +
+    geom_point(color='red') +
+      facet_wrap(~day_of_week)+
+ggtitle('Average alighting across hours of the week') +
+  labs(caption ="Average alightment of passengers seems to be higher in the mornings on weekdays.\n Probably owing to students studying all night on campus.")
+```
+
+```{r echo = FALSE}
+avg_commute_stats %>% 
+  ggplot(aes(x=hour_of_day,y = on_board)) +
+    geom_line(colour = 'pink', size=1.2) + 
+  geom_hline(yintercept = 0) +
+      facet_wrap(~day_of_week)+
+ggtitle('Average \'on board\' passengers across hours of the week') +
+  labs( caption = 'Daily traffic on board starts increasing at around 12pm  and peaks around 16:00 - 17:00 hours as seen from the graph.') +
+  scale_x_continuous(limits=c(5, 22))
+```
+
+```{r echo = FALSE}
+capmetro %>% 
+  ggplot(aes(x=temperature,y = boarding)) +
+    geom_point(colour = 'dark green', size=1.2) +
+      # facet_wrap(~day_of_week)+
+ggtitle('Boarding trend vs Temperature changes') +
+  labs(caption= 'We do not see any relationship between temperature and boarding ridership counts.')
+```
+
+
+## **Portfolio modeling**
+
+
+Comment: 
+The 3 different portfolios we have seleected for our analysis are the following:
+- Tech based :-9252.479
+- Oil and Gas: -15124.84 
+- Health and Biotech: -7523.363 
+
+The reason we chose the ETFs based on the above portfolios is because the Tech industry is booming nowadays with advances in Data Science and Artificial Intelligence. We chose Oil and Gas because we thought it is less volatile compared to other industries. Also, we chose health and Biotech because we thought it might have a better returns owing to the surge in sales of medicines post the outbreak of COVID-19.
+
+### answer:
+mean(sim1[,n_days] - initial_wealth)
+  - tech : 1670.2
+mean(sim2[,n_days] - initial_wealth)
+  - oil: 698.5139
+mean(sim3[,n_days] - initial_wealth)
+  - health/biotech: 1498.692
+  
+Tech has the highest average return of 1670.2 dollars above the initial 100,000 dollars.
+
+The VaR for each portfolio was -9252.479,-15124.84 and -7523.363 dollars for Tech, Oil & Gas and Health/Biotech. 
+
+Conclusion:
+The VaR for Oil & Gas has the highest [-15124.84], but by looking at the highest average return tech has the highest average return of 1607.2 dollars above the initial 100,000 dollars.
+
+
+
+### First Portfolio: Technology Equities EFTs
+```{r setup, include=FALSE}
+#First Portfolio : "Tech"
+myStocks = c("VGT","XLK","IYW", "CIBR", "SKYY")
+getSymbols(myStocks, from = "2016-01-01")
+```
+
+```{r echo=FALSE, warning=FALSE}
+# Adjusting for splits and/or dividends
+for(ticker in myStocks) {
+  expr = paste0(ticker, "a = adjustOHLC(", ticker, ")")
+  eval(parse(text=expr))
+}
+head(VGTa)
+```
+
+```{r echo=FALSE, warning=FALSE}
+# Combine close to close changes in a single matrix
+# c("VGT","XLK","IGV","IYW", "CIBR", "SKYY")
+all_returns = cbind(ClCl(VGTa),ClCl(XLKa),ClCl(IYW),ClCl(CIBR),ClCl(SKYYa))
+```
+
+```{r echo=FALSE, warning=FALSE}
+all_returns = as.matrix(na.omit(all_returns))
+```
+
+### Simulate different scenarios
+```{r echo=FALSE, warning=FALSE}
+
+set.seed(1)
+initial_wealth = 100000
+sim1 = foreach(i=1:5000, .combine='rbind') %do% {
+	total_wealth = initial_wealth
+	weights = c(0.2, 0.2, 0.2, 0.2, 0.2)
+	holdings = weights * total_wealth
+	n_days = 20
+	wealthtracker = rep(0, n_days)
+	for(today in 1:n_days) {
+		return.today = resample(all_returns, 1, orig.ids=FALSE)
+		holdings = holdings + holdings*return.today
+		total_wealth = sum(holdings)
+		wealthtracker[today] = total_wealth
+	}
+	wealthtracker
+}
+
+# Profit/loss
+mean(sim1[,n_days]) # mean 
+mean(sim1[,n_days] - initial_wealth) # upper 
+hist(sim1[,n_days]- initial_wealth, breaks=30) # histogram
+
+# 5% value at risk:
+quantile(sim1[,n_days]- initial_wealth, prob=0.05) # VaR 5%
+```
+
+### Second Portofolio: Oil and Gas Commodities
+```{r echo=FALSE, warning=FALSE}
+myStocks2 = c("DBO","BNO","USO", "UNG")
+getSymbols(myStocks2, from = "2016-01-01")
+```
+
+```{r echo=FALSE, warning=FALSE}
+# Adjusting for splits and/or dividends
+for(ticker in myStocks2) {
+  expr = paste0(ticker, "a = adjustOHLC(", ticker, ")")
+  eval(parse(text=expr))
+}
+head(DBOa)
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+# Combine close to close changes in a single matrix
+all_returns = cbind(ClCl(DBOa),ClCl(BNOa),ClCl(USOa),ClCl(UNGa))
+```
+
+```{r echo=FALSE, warning=FALSE}
+all_returns = as.matrix(na.omit(all_returns))
+head(all_returns)
+# pairs(all_returns)
+```
+
+```{r echo=FALSE, warning=FALSE}
+# Now simulate many different possible scenarios  
+set.seed(1)
+initial_wealth = 100000
+sim2 = foreach(i=1:5000, .combine='rbind') %do% {
+	total_wealth = initial_wealth
+	weights = c(0.25, 0.25, 0.25, 0.25)
+	holdings = weights * total_wealth
+	n_days = 20
+	wealthtracker = rep(0, n_days)
+	for(today in 1:n_days) {
+		return.today = resample(all_returns, 1, orig.ids=FALSE)
+		holdings = holdings + holdings*return.today
+		total_wealth = sum(holdings)
+		wealthtracker[today] = total_wealth
+	}
+	wealthtracker
+}
+
+# Profit/loss
+mean(sim2[,n_days]) # mean 
+mean(sim2[,n_days] - initial_wealth) # upper 
+hist(sim2[,n_days]- initial_wealth, breaks=30) # histogram
+
+# 5% value at risk:
+quantile(sim2[,n_days]- initial_wealth, prob=0.05) # VaR 5%
+```
+
+### Third Portofolio: Biotech Equities
+
+```{r echo=FALSE, warning=FALSE}
+myStocks3 = c("VHT","IBB","IXJ", "IYH","IHE")
+getSymbols(myStocks3, from = "2016-01-01")
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+# Adjusting for splits and/or dividends
+for(ticker in myStocks3) {
+  expr = paste0(ticker, "a = adjustOHLC(", ticker, ")")
+  eval(parse(text=expr))
+}
+head(VHTa)
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+# Combine close to close changes in a single matrix
+all_returns = cbind(ClCl(VHTa),ClCl(IBBa),ClCl(IXJa),ClCl(IYHa),ClCl(IHEa))
+```
+
+```{r echo=FALSE, warning=FALSE}
+all_returns = as.matrix(na.omit(all_returns))
+head(all_returns)
+# pairs(all_returns)
+```
+
+```{r echo=FALSE, warning=FALSE}
+# Now simulate many different possible scenarios  
+set.seed(1)
+initial_wealth = 100000
+sim3 = foreach(i=1:5000, .combine='rbind') %do% {
+	total_wealth = initial_wealth
+	weights = c(0.20, 0.20, 0.20, 0.20, 0.20)
+	holdings = weights * total_wealth
+	n_days = 20
+	wealthtracker = rep(0, n_days)
+	for(today in 1:n_days) {
+		return.today = resample(all_returns, 1, orig.ids=FALSE)
+		holdings = holdings + holdings*return.today
+		total_wealth = sum(holdings)
+		wealthtracker[today] = total_wealth
+	}
+	wealthtracker
+}
+
+# Profit/loss
+mean(sim3[,n_days]) # mean 
+mean(sim3[,n_days] - initial_wealth) # upper 
+hist(sim3[,n_days]- initial_wealth, breaks=30) # histogram
+
+# 5% value at risk:
+quantile(sim3[,n_days]- initial_wealth, prob=0.05) # VaR 5%
+```
+
+Comparing portfolios.
+```{r, echo=FALSE, warning=FALSE}
+par(mfrow = c(3, 1))
+hist(sim1[,n_days]- initial_wealth, breaks=30, main = "P1: Tech", xlab = "$ Total Returns")
+hist(sim2[,n_days]- initial_wealth, breaks=30,  main = "P2: Oil & Gas", xlab = "$ Total Returns")
+hist(sim3[,n_days]- initial_wealth, breaks=30, main = "P3:  Health & Biotech", xlab = "$ Total Returns")
+
+```
+
+
+## **Clustering and PCA**
+
+
+### Analysis:
+
+We first did Clustering with Kmeans and came up with two plots; one for color and one for quality.
+We had 2 clusters for the first plot because we wanted to see if the method would be able to cluster into two distinct groups, such as two different colors.
+There were promising results with 2 clusters, so we switched our focus to quality. We then looked at the wine data and used the unique variable to determine how many different scores were given and we came up with 7 scores.
+We made a second clustering plot with 7 cluster groups and saw a lot of overlap. We moved on to PCA to verify our answers.
+PCA was a much more clear and direct approach for this wine analysis. PCA shows us when we plot for color, we get two very distinct groups, much like with clustering.
+We then plot for quality, and we get promising results there too. If we compare the results with color, we can observe that white wines overall have higher quality scores than red wines.
+These results also align with our clustering method. We can now make an inference that the first couple of clusters are the higher quality wines and the cluster 5 and below are the lower quality wines.
+Overall, PCA is a much more clear approach to this problem. 
+
+### Clustering:
+
+```{r echo =FALSE,warning=FALSE}
+library(ggplot2)
+library(ClusterR)  # for kmeans++
+library(foreach)
+library(mosaic)
+```
+
+```{r echo=FALSE, warning=FALSE}
+#read in code
+library(RCurl)
+url <- getURL("https://raw.githubusercontent.com/jgscott/STA380/master/data/wine.csv", ssl.verifypeer=0L, followlocation=1L)
+wine <-read.csv(text=url)
+
+# Select only the 11 properties
+p = wine[,(1:11)]
+# Center and scale the data
+X = scale(p, center=TRUE, scale=TRUE)
+summary(X)
+
+# Extract the centers and scales from the rescaled data (which are named attributes)
+mu = attr(X,"scaled:center")
+sigma = attr(X,"scaled:scale")
+
+# Run k-means with 5 clusters and 20 starts
+clust1 = kmeans(X, 5, nstart=20)
+
+# What are the clusters?
+clust1$center  # not super helpful
+clust1$center[1,]*sigma + mu
+clust1$center[2,]*sigma + mu
+clust1$center[4,]*sigma + mu
+
+
+# A few plots with cluster membership shown
+# qplot is in the ggplot2 library
+qplot(quality, color, data=wine, color=factor(clust1$cluster))
+
+clust1$totss 
+```
+
+```{r echo= FALSE, warning=FALSE}
+## second cluster method
+
+# Library required for fviz_cluster function
+# install.packages("factoextra")
+# install.packages("ggsignif")
+# install.packages("rstatix")
+library(factoextra)
+```
+
+```{r echo =FALSE, warning=FALSE}
+
+# Scaling dataset
+# Select only the 11 properties
+p = wine[,1:11]
+# Center and scale the data
+X = scale(p, center=TRUE, scale=TRUE)
+summary(X)
+
+km <- kmeans(X, 2, 25)
+
+
+# Visualize the clusters
+plot <- fviz_cluster(km, data = wine[1:11])
+
+plot
+
+#kmeans 7
+
+km <- kmeans(X, 7, 25)
+
+
+# Visualize the clusters
+plot1 <- fviz_cluster(km, data = wine[1:11])
+
+plot1
+
+```
+
+```{r echo=FALSE, warning=FALSE}
+##PCA
+
+rm(list =ls())
+
+library(RCurl)
+url <- getURL("https://raw.githubusercontent.com/jgscott/STA380/master/data/wine.csv", ssl.verifypeer=0L, followlocation=1L)
+wine <-read.csv(text=url)
+
+library(dplyr)
+library(readr)
+
+#make color numeric
+clean_wine = wine %>%                          
+  mutate(color = replace(color, color == "red", as.integer(1))) %>%
+  mutate(color = replace(color, color =="white", as.integer(0)))
+#view new data
+# View(clean_wine)
+
+clean_wine$color <- as.numeric(clean_wine$color)
+
+#PCA
+pr_out <- prcomp(clean_wine[c(1:11)], center = TRUE, scale = TRUE)
+summary(pr_out) #13 PCs
+
+pr_var <-  pr_out$sdev ^ 2
+pve <- pr_var / sum(pr_var)
+plot(pve, xlab = "Principal Component", ylab = "Proportion of Variance Explained", ylim = c(0,1), type = 'b')
+
+plot(cumsum(pve), xlab = "Principal Component", ylab = "Cumulative Proportion of Variance Explained", ylim =c(0,1), type = 'b')
+
+rot_loading <- varimax(pr_out$rotation[, 1:4])
+rot_loading
+
+library(devtools)
+Sys.setenv(R_REMOTES_NO_ERRORS_FROM_WARNINGS="true")
+# install_github("vqv/ggbiplot")
+
+require(ggbiplot)
+ggbiplot(pr_out)
+
+##PLOT for color
+
+biplot = ggbiplot(pcobj = pr_out,
+                  choices = c(1,4),
+                  obs.scale = 1, var.scale = 1,  # Scaling of axis
+                  labels = row.names(clean_wine),     # Add labels as rownames
+                  labels.size = .5,
+                  varname.size = .3,
+                  varname.abbrev = TRUE,  # Abbreviate variable names (TRUE)
+                  var.axes = FALSE,      # Remove variable vectors (TRUE)
+                  # circle = FALSE,        # Add unit variance circle (TRUE)
+                  ellipse = TRUE, 
+                  groups = wine$color) # Adding ellipses
+
+biplot2 = biplot + labs(title = "PCA of yield contributing parameters",
+                       colour = "Seed priming")
+biplot2
+
+cor(clean_wine[, c(1:11, 13)])
+
+##Plot for quality
+
+biplot4 = ggbiplot(pcobj = pr_out,
+                  choices = c(1,4),
+                  obs.scale = 1, var.scale = 1,  # Scaling of axis
+                  labels = row.names(clean_wine),     # Add labels as rownames
+                  labels.size = 1,
+                  varname.size = 1,
+                  varname.abbrev = TRUE,  # Abbreviate variable names (TRUE)
+                  var.axes = FALSE,      # Remove variable vectors (TRUE)
+                  # circle = FALSE,        # Add unit variance circle (TRUE)
+                  ellipse = TRUE, 
+                  groups = wine$quality) # Adding ellipses
+print(biplot4)
+
+```
+
+
+
+## **Market segmentation**
+
+PC1: sports, food, family, crafts, religion, parenting, school (home life)
+PC3: travel, politics, news, computers, business, automotive, small business (business)
+PC4: food, health nutrition, cooking, eco, outdoors, personal fitness (health and fitness)
+
+Through PCA we are able to determine 3 different types of categories the tweets fall into: homelife, business and health/fitness.
+
+### PCA Method:
+
+```{r, echo=FALSE, warning=FALSE}
+rm(list =ls())
+
+urlfile <- getURL("https://raw.githubusercontent.com/jgscott/STA380/master/data/social_marketing.csv", ssl.verifypeer=0L, followlocation=1L)
+market <-read.csv(text=urlfile)
+
+#remove chatter and uncategorized
+mydata2 = select(market, -2, -6)
+head(mydata2)
+
+pr_out <- prcomp(mydata2[2:35], center = TRUE, scale = TRUE)
+summary(pr_out)
+
+pr_var <-  pr_out$sdev ^ 2
+pve <- pr_var / sum(pr_var)
+plot(pve, xlab = "Principal Component", ylab = "Proportion of Variance Explained", ylim = c(0,1), type = 'b')
+
+plot(cumsum(pve), xlab = "Principal Component", ylab = "Cumulative Proportion of Variance Explained", ylim =c(0,1), type = 'b')
+
+rot_loading <- varimax(pr_out$rotation[, 1:5])
+rot_loading
+
+```
+
+## **The Reuters corpus**
+
+```{r, echo=FALSE, warning= FALSE}
+library(tm) 
+library(tidyverse)
+library(slam)
+library(proxy)
+readerPlain = function(fname){
+  readPlain(elem=list(content=readLines(fname)), 
+            id=fname, language='en') }
+
+file_list = Sys.glob('ReutersC50/C50train/*/*.txt')
+
+author_name = lapply(file_list, readerPlain) 
+mynames = file_list %>%
+  { strsplit(., '/', fixed=TRUE) } %>%
+  { lapply(., tail, n=2) } %>%
+  { lapply(., paste0, collapse = '') } %>%
+  unlist
+names(author_name) = mynames
+
+#list authors
+main_dir = "ReutersC50/C50train/"
+
+dir_list = list.dirs(main_dir,full.names = FALSE, 
+                      recursive = FALSE) 
+
+# install.packages('corpus)
+library(corpus)
+doc_raw = Corpus(VectorSource(author_name))
+
+# reference from Dr. Scott's code
+my_docs = doc_raw
+my_docs = tm_map(my_docs, content_transformer(tolower)) # make everything lowercase
+my_docs = tm_map(my_docs, content_transformer(removeNumbers)) # remove numbers
+my_docs = tm_map(my_docs, content_transformer(removePunctuation)) # remove punctuation
+my_docs = tm_map(my_docs, content_transformer(stripWhitespace)) ## remove excess white-space
+
+my_docs = tm_map(my_docs, content_transformer(removeWords), stopwords("en"))
+
+## create a doc-term-matrix
+DTM_authors = DocumentTermMatrix(my_docs)
+class(DTM_authors)  # a special kind of sparse matrix format
+DTM_authors = removeSparseTerms(DTM_authors, 0.95)
+
+library(data.table) 
+
+#find frequent terms
+colSum = colSums(as.matrix(DTM_authors))
+length(colSum)
+doc_features = data.table(name = attributes(colSum)$names, count = colSum)
+
+doc_features[order(-count)][1:10] #top 10 most frequent words
+doc_features[order(count)][1:10] #least 10 frequent words
+
+
+# Word cloud of words with min frequency of 1500 in entire C50 train dataset
+library(wordcloud)
+# create wordcloud
+wordcloud(names(colSum), colSum, min.freq = 1500, scale = c(6,.1), colors = brewer.pal(10, 'Accent'))
+
+# construct TF IDF weights
+tfidf_author = weightTfIdf(DTM_authors) # a statistical measure that evaluates how relevant a word is to a document in a collection of documents
+
+colSum2 = colSums(as.matrix(tfidf_author))
+length(colSum2)
+
+doc_f2 = data.table(name = attributes(colSum2)$names, count = colSum2)
+
+# the most frequent and least frequent words by number of documents
+doc_f2[order(-count)][1:10] #top 10 most frequent words
+doc_f2[order(count)][1:10] #least 10 frequent words
+
+# Word cloud of words with min frequency of 15 in the dataset that's checked with a statistical measure that evaluates how relevant a word is to a document in a collection of documents
+#create wordcloud
+wordcloud(names(colSum2), colSum2, min.freq = 15, scale = c(6,.1), colors = brewer.pal(10, 'Accent'))
+
+```
+
+
+Question: What question(s) are you trying to answer?
+
+What are the most frequently used words across the entire C50 dataset and by using TF/IDF check how relevant a word is to a document in a collection of document?
+
+Approach: What approach/statistical tool did you use to answer the questions?
+
+ - To calculate the frequencies of words & authors across the entire c50 dataset, we tried the DocumentTermMatrix. To calculate the usage of these words across documents we used the inverse document.
+
+Results: What evidence/results did your approach provide to answer the questions? (E.g. any numbers, tables, figures as appropriate.)
+
+ - We provided the wordcloud and PCA to answer the questions. By using wordcloud, it visualizes the most words that were used in the total dataset. 
+ 
+Conclusion: What are your conclusions about your questions? Provide a written interpretation of your results, understandable to stakeholders who might plausibly take an interest in this data set.
+
+ - By looking at the wordcloud, we can found out some words are used much more frequently within certain documents. However, there are some words that shows most frequency does not show in certain documents (e.g. character)  
+
+
+## **Association Rule Mining**
+
+```{r echo= FALSE, warning = FALSE}
+grocery_trans = read.transactions("D:/Summer/STA2/datasets/groceries.txt",sep=',',format="basket",rm.duplicates=TRUE)
+
+summary(grocery_trans)
+```
+
+Our dataset contains 9835 itemsets/transactions and 169 items. Most frequently purchased items include -Wholemilk, other vegetables, rolls/buns, soda, yogurt and Others.
+
+Minimum items bought - 1. Maximum no. of items bought were - 32.
+
+```{r echo= FALSE, warning = FALSE}
+# Create an item frequency plot for the top 20 items
+itemFrequencyPlot(grocery_trans,topN=20,type="absolute", cex.names=0.7)
+```
+
+As can be seen from above graph, Whole milk has the highest frequency of nearly 2500 among all items in the itemset.
+
+```{r echo= FALSE, warning = FALSE}
+itemFrequencyPlot(grocery_trans, support=0.1, cex.names=0.8)
+```
+
+We find that whole milk has the highest frequency with support = 0.1. It being set to 0.1 means that the item must occur at least 10 times in 100 transactions.
+
+Applying the rules to our transactions :-
+
+```{r echo= FALSE, warning = FALSE}
+grocery_rules = apriori(grocery_trans, 
+                       parameter=list(support=.002, confidence=.6))
+summary(grocery_rules)
+```
+
+Setting support to 0.002 as it was the optimum value at which the apriori could learn some association rules from the transactions. A confidence level of 50% was set as the minimum level of confidence we want to create effective rules.
+
+Further, we required an absolute minimum support count of 9 for us to establish the association rules at a support of 0.002 and confidence of 0.5 . Hence, we were able to create 376 rules.
+
+A total of 376 rules generated. Most rules are 4 items long.
+
+Let us plot our rules :
+
+```{r echo= FALSE, warning = FALSE}
+plot(grocery_rules, jitter=0)
+```
+
+We observe higher lift for low support values below 0.004
+
+Now, let us inspect the grocery rules (seeing the first 10) :
+
+```{r echo= FALSE, warning = FALSE}
+arules :: inspect(head(grocery_rules,10))
+```
+
+We observe that most of the associations created lead to the purchase of whole milk or other vegetables among all items.
+
+Inspecting rules further by count and checking the top 10 rules:
+
+```{r echo= FALSE, warning = FALSE}
+arules :: inspect(head(sort(grocery_rules, by ="count"),10))
+```
+
+Although we observe a high count for whole milk purchases with high values of support and a minimum 60% confidence, the lift value is low \~2.5 . This tells us that we cannot rely upon the confidence factor of whole milk being purchased as there could be various other factors contributing to that value.
+
+Let us sort by lift and check the top 10 association rules created -
+
+```{r echo= FALSE, warning = FALSE}
+arules :: inspect(head(sort(grocery_rules, by ="lift"),10))
+```
+
+Owing to the high lift values -
+
+Looks like people tend to buy whole milk, beef , various types of fruits (citrus/tropical) and root vegetables together. Possibly diet conscious.
+
+We observe that yogurt is tends to be often purchased bought along with rolls/buns, whipped cream and whole milk.
+
+Inspecting rules with lift > 4.5:
+
+```{r echo= FALSE, warning = FALSE}
+arules :: inspect(subset(grocery_rules, subset=lift > 4.5))
+```
+
+On an average, people do seem to want to have a balanced diet of nutritions and buy root vegetables along with whole milk, beef , various types of fruits (citrus/tropical) .
+
+```{r echo= FALSE, warning = FALSE}
+plot(head(sort(grocery_rules, by="lift"), 20),
+  method="graph", control=list(cex=.9))
+```
+
+In conclusion, we can assume the following based on the association rule model:
+
+1. Whole Milk is being purchased by most people along with butter, curd , whipped cream fruits and vegetables. However, since the lift is low, we are not sure of the causes leading to this association.
+
+2. Root vegetables and fruits occur often with other vegetables indicating that people tend to make conscious nutritious choices.
+
+3. Citrus fruits and tropical fruits occur together, suggesting that people are preferring fruits that are native to hot and humid climates (tropical countries).
+
+4. Root vegetables are being purchased with a lift>4.5 indicating that nearly 5 times the chance of people buying it along with buying tropical/citrus fruits, whole milk , beef and other vegetables.
+
+5.  From the above point, we observe that people are health conscious and seem to purchase accordingly in order to have a balanced diet.
+
+```{r echo= FALSE, warning = FALSE}
+grocery_graph = associations2igraph(subset(grocery_rules, lift>4), associationsAsNodes = FALSE)
+igraph::write_graph(grocery_graph, file='grocery.graphml', format = "graphml")
+
+plot(grocery_graph)
+```
